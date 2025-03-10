@@ -30,11 +30,25 @@ type (
 		DeletedAt *time.Time `json:"deletedAt,omitempty"`
 	}
 
+	ChartExportable struct {
+		Handle string                `json:"handle" yaml:"handle"`
+		Name   string                `json:"name" yaml:"name"`
+		Config ChartConfigExportable `json:"config" yaml:"config"`
+		Labels map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
+	}
+
 	ChartConfig struct {
 		Reports     []*ChartConfigReport   `json:"reports,omitempty"`
 		ColorScheme string                 `json:"colorScheme,omitempty"`
 		NoAnimation bool                   `json:"noAnimation,omitempty"`
 		Toolbox     map[string]interface{} `json:"toolbox,omitempty"`
+	}
+
+	ChartConfigExportable struct {
+		Reports     []ChartConfigReportExportable `json:"reports,omitempty" yaml:"reports,omitempty"`
+		ColorScheme string                        `json:"colorScheme,omitempty" yaml:"colorScheme,omitempty"`
+		NoAnimation bool                          `json:"noAnimation,omitempty" yaml:"noAnimation,omitempty"`
+		Toolbox     map[string]interface{}        `json:"toolbox,omitempty" yaml:"toolbox,omitempty"`
 	}
 
 	ChartConfigReport struct {
@@ -48,6 +62,20 @@ type (
 		Tooltip    map[string]interface{}   `json:"tooltip,omitempty"`
 		Offset     map[string]interface{}   `json:"offset,omitempty"`
 		Renderer   struct {
+			Version string `json:"version,omitempty" `
+		} `json:"renderer,omitempty"`
+	}
+
+	ChartConfigReportExportable struct {
+		ModuleHandle string                   `json:"moduleHandle" yaml:"moduleHandle"`
+		Filter       string                   `json:"filter" yaml:"filter"`
+		Metrics      []map[string]interface{} `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+		Dimensions   []map[string]interface{} `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+		YAxis        map[string]interface{}   `json:"yAxis,omitempty" yaml:"yAxis,omitempty"`
+		Legend       map[string]interface{}   `json:"legend,omitempty" yaml:"legend,omitempty"`
+		Tooltip      map[string]interface{}   `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
+		Offset       map[string]interface{}   `json:"offset,omitempty" yaml:"offset,omitempty"`
+		Renderer     struct {
 			Version string `json:"version,omitempty" `
 		} `json:"renderer,omitempty"`
 	}

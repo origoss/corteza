@@ -46,6 +46,16 @@ type (
 		Name string `json:"name"`
 	}
 
+	ModuleExportable struct {
+		Name   string                  `json:"name" yaml:"name"`
+		Handle string                  `json:"handle" yaml:"handle"`
+		Config ModuleConfigExportable  `json:"config" yaml:"config"`
+		Meta   types.JSONText          `json:"meta" yaml:"meta"`
+		Fields []ModuleFieldExportable `json:"fields" yaml:"fields"`
+		Labels map[string]string       `json:"labels,omitempty" yaml:"labels,omitempty"`
+		Issues []dal.Issue             `json:"issues,omitempty" yaml:"issues,omitempty"`
+	}
+
 	ModuleConfig struct {
 		// How and where the records of this module are stored in the database
 		DAL ModuleConfigDAL `json:"dal"`
@@ -61,6 +71,14 @@ type (
 		RecordDeDup ModuleConfigRecordDeDup `json:"recordDeDup"`
 	}
 
+	ModuleConfigExportable struct {
+		DAL             ModuleConfigDALExportable   `json:"dal" yaml:"dal"`
+		Privacy         ModuleConfigDataPrivacy     `json:"privacy" yaml:"privacy"`
+		Discovery       ModuleConfigDiscovery       `json:"discovery" yaml:"discovery"`
+		RecordRevisions ModuleConfigRecordRevisions `json:"recordRevisions" yaml:"recordRevisions"`
+		RecordDeDup     ModuleConfigRecordDeDup     `json:"recordDeDup" yaml:"recordDedup"`
+	}
+
 	ModuleConfigDAL struct {
 		ConnectionID uint64 `json:"connectionID,string"`
 
@@ -71,6 +89,11 @@ type (
 		Ident string `json:"ident"`
 
 		SystemFieldEncoding SystemFieldEncoding `json:"systemFieldEncoding"`
+	}
+
+	ModuleConfigDALExportable struct {
+		Constraints map[string][]any `json:"constraints" yaml:"constraints"`
+		Ident       string           `json:"ident" yaml:"ident"`
 	}
 
 	ModuleConfigRecordRevisions struct {

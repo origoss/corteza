@@ -28,6 +28,18 @@ type (
 		Name string `json:"name"`
 	}
 
+	NamespaceExportable struct {
+		Name    string `json:"name" yaml:"name"`
+		Slug    string `json:"slug" yaml:"slug"`
+		Enabled bool   `json:"enabled" yaml:"enabled"`
+
+		Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+		Chart  []ChartExportable
+		Module []ModuleExportable
+		Page   []PageExportable
+	}
+
 	NamespaceFilter struct {
 		NamespaceID []string `json:"namespaceID"`
 

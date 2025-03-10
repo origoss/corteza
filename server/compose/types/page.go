@@ -53,6 +53,20 @@ type (
 		Description string `json:"description"`
 	}
 
+	PageExportable struct {
+		Handle       string                 `json:"handle" yaml:"handle"`
+		ModuleHandle string                 `json:"moduleHandle" yaml:"moduleHandle"`
+		Visible      bool                   `json:"visible" yaml:"visible"`
+		Weight       int                    `json:"weight" yaml:"weight"`
+		Title        string                 `json:"title" yaml:"title"`
+		Description  string                 `json:"description" yaml:"description"`
+		Labels       map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+		Meta         PageMeta               `json:"meta" yaml:"meta"`
+		PageLayout   []PageLayoutExportable `json:"pageLayout" yaml:"pageLayout"`
+		Config       PageConfig             `json:"config" yaml:"config"`
+		Blocks       PageBlocks             `json:"blocks" yaml:"blocks"`
+	}
+
 	PageBlocks []PageBlock
 
 	PageBlock struct {

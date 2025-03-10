@@ -24,6 +24,7 @@ import (
 	systemEnvoy "github.com/cortezaproject/corteza/server/system/envoy"
 	systemService "github.com/cortezaproject/corteza/server/system/service"
 	systemTypes "github.com/cortezaproject/corteza/server/system/types"
+	"gopkg.in/yaml.v3"
 )
 
 type (
@@ -44,24 +45,27 @@ type (
 		Set    []*namespacePayload   `json:"set"`
 	}
 
-	pageFinder interface {
+	pageService interface {
 		Find(ctx context.Context, filter types.PageFilter) (set types.PageSet, f types.PageFilter, err error)
+		MakeExportablePage(ctx context.Context, p *types.Page) (*types.PageExportable, error)
 	}
 
-	pageLayoutFinder interface {
+	pageLayoutService interface {
 		Find(ctx context.Context, filter types.PageLayoutFilter) (set types.PageLayoutSet, f types.PageLayoutFilter, err error)
+		MakeExportablePageLayout(ctx context.Context, pl *types.PageLayout) (*types.PageLayoutExportable, error)
 	}
 
-	chartFinder interface {
+	chartService interface {
 		Find(ctx context.Context, filter types.ChartFilter) (set types.ChartSet, f types.ChartFilter, err error)
+		MakeExportableChart(ctx context.Context, c *types.Chart) (*types.ChartExportable, error)
 	}
 
 	Namespace struct {
 		namespace  service.NamespaceService
 		module     service.ModuleService
-		page       pageFinder
-		pageLayout pageLayoutFinder
-		chart      chartFinder
+		page       pageService
+		pageLayout pageLayoutService
+		chart      chartService
 		locale     service.ResourceTranslationsManagerService
 		attachment service.AttachmentService
 		role       systemService.RoleService
@@ -237,7 +241,100 @@ func (ctrl Namespace) Clone(ctx context.Context, r *request.NamespaceClone) (int
 	return ctrl.makePayload(ctx, ns, err)
 }
 
-func (ctrl Namespace) Export(ctx context.Context, r *request.NamespaceExport) (out interface{}, err error) {
+func (ctrl Namespace) gatherExportComponents(ctx context.Context, nsId uint64) (*types.Namespace, *types.ModuleSet, *types.PageSet, *types.ChartSet, error) {
+	namespace, err := ctrl.namespace.FindByID(ctx, nsId)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	moduleSet, _, err := ctrl.module.Find(ctx, types.ModuleFilter{NamespaceID: namespace.ID})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	pageSet, _, err := ctrl.page.Find(ctx, types.PageFilter{NamespaceID: namespace.ID})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	chartSet, _, err := ctrl.chart.Find(ctx, types.ChartFilter{NamespaceID: namespace.ID})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return namespace, &moduleSet, &pageSet, &chartSet, nil
+}
+
+func (ctrl Namespace) constructExportableStruct(ctx context.Context, nsId uint64) (*types.NamespaceExportable, error) {
+	namespace, moduleSet, pageSet, chartSet, err := ctrl.gatherExportComponents(ctx, nsId)
+	if err != nil {
+		return nil, err
+	}
+
+	en := ctrl.namespace.MakeExportableNamespace(namespace)
+
+	for _, module := range *moduleSet {
+		m := ctrl.module.MakeExportableModule(module)
+		en.Module = append(en.Module, *m)
+	}
+
+	for _, page := range *pageSet {
+		ep, err := ctrl.page.MakeExportablePage(ctx, page)
+		if err != nil {
+			return nil, err
+		}
+		pageLayoutSet, _, err := ctrl.pageLayout.Find(ctx, types.PageLayoutFilter{NamespaceID: namespace.ID, PageID: page.ID})
+		if err != nil {
+			return nil, err
+		}
+		for _, pageLayout := range pageLayoutSet {
+			epl, err := ctrl.pageLayout.MakeExportablePageLayout(ctx, pageLayout)
+			if err != nil {
+				return nil, err
+			}
+			ep.PageLayout = append(ep.PageLayout, *epl)
+		}
+		en.Page = append(en.Page, *ep)
+	}
+
+	for _, chart := range *chartSet {
+		c, err := ctrl.chart.MakeExportableChart(ctx, chart)
+		if err != nil {
+			return nil, err
+		}
+		en.Chart = append(en.Chart, *c)
+	}
+
+	return en, nil
+}
+
+func (ctrl Namespace) Export(ctx context.Context, r *request.NamespaceExport) (interface{}, error) {
+	exportable, err := ctrl.constructExportableStruct(ctx, r.NamespaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Archive encoded resources
+	buf := bytes.NewBuffer(nil)
+	zw := zip.NewWriter(buf)
+
+	f, err := zw.Create(fmt.Sprintf("%s.yaml", r.Filename))
+	if err != nil {
+		return nil, err
+	}
+
+	marshalledData, _ := yaml.Marshal(exportable)
+	f.Write(marshalledData)
+
+	err = zw.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return ctrl.serveExport(ctx, fmt.Sprintf("%s.zip", r.Filename), bytes.NewReader(buf.Bytes()), nil)
+}
+
+func (ctrl Namespace) ExportOld(ctx context.Context, r *request.NamespaceExport) (out interface{}, err error) {
 	nodes, err := ctrl.gatherNodes(ctx, r.NamespaceID)
 	if err != nil {
 		return

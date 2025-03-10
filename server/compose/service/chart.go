@@ -209,6 +209,107 @@ func (svc chart) UndeleteByID(ctx context.Context, namespaceID, chartID uint64) 
 	return trim1st(svc.updater(ctx, namespaceID, chartID, ChartActionUndelete, svc.handleUndelete))
 }
 
+func (svc *chart) MakeExportableChart(ctx context.Context, c *types.Chart) (*types.ChartExportable, error) {
+	config, err := svc.MakeExportableChartConfig(ctx, &c.Config, c.NamespaceID)
+	if err != nil {
+		return nil, err
+	}
+	return &types.ChartExportable{
+		Name:   c.Name,
+		Handle: c.Handle,
+		Config: *config,
+		Labels: c.Labels,
+	}, nil
+}
+
+func (svc *chart) CreateChartFromExportable(ctx context.Context, c *types.ChartExportable, nsID uint64) *types.Chart {
+	config := svc.CreateChartConfigFromExportable(ctx, &c.Config, nsID)
+	return &types.Chart{
+		ID:          nextID(),
+		Name:        c.Name,
+		Handle:      c.Handle,
+		NamespaceID: nsID,
+		Config:      *config,
+		Labels:      c.Labels,
+		CreatedAt:   *now(),
+	}
+}
+
+func (svc *chart) MakeExportableChartConfig(ctx context.Context, c *types.ChartConfig, nsId uint64) (*types.ChartConfigExportable, error) {
+	var exportableReports []types.ChartConfigReportExportable
+	for _, r := range c.Reports {
+		er, err := svc.MakeExportableChartConfigReport(ctx, r, nsId)
+		if err != nil {
+			return nil, err
+		}
+		if er != nil {
+			exportableReports = append(exportableReports, *er)
+		}
+	}
+	return &types.ChartConfigExportable{
+		ColorScheme: c.ColorScheme,
+		NoAnimation: c.NoAnimation,
+		Toolbox:     c.Toolbox,
+		Reports:     exportableReports,
+	}, nil
+}
+
+func (svc *chart) CreateChartConfigFromExportable(ctx context.Context, c *types.ChartConfigExportable, nsID uint64) *types.ChartConfig {
+	var reports []*types.ChartConfigReport
+	for _, r := range c.Reports {
+		report := svc.CreateChartConfigReportFromExportable(ctx, &r, nsID)
+		reports = append(reports, report)
+	}
+	return &types.ChartConfig{
+		Reports:     reports,
+		ColorScheme: c.ColorScheme,
+		NoAnimation: c.NoAnimation,
+		Toolbox:     c.Toolbox,
+	}
+}
+
+func (svc *chart) MakeExportableChartConfigReport(ctx context.Context, r *types.ChartConfigReport, nsId uint64) (*types.ChartConfigReportExportable, error) {
+	moduleHandle := ""
+	if nsId != 0 && r.ModuleID != 0 {
+		module, err := loadModule(ctx, svc.store, nsId, r.ModuleID)
+		if err != nil {
+			return nil, err
+		}
+		moduleHandle = module.Handle
+	}
+	return &types.ChartConfigReportExportable{
+		ModuleHandle: moduleHandle,
+		Filter:       r.Filter,
+		Metrics:      r.Metrics,
+		Dimensions:   r.Dimensions,
+		YAxis:        r.YAxis,
+		Legend:       r.Legend,
+		Tooltip:      r.Tooltip,
+		Offset:       r.Offset,
+		Renderer:     r.Renderer,
+	}, nil
+}
+
+func (svc *chart) CreateChartConfigReportFromExportable(ctx context.Context, r *types.ChartConfigReportExportable, nsID uint64) *types.ChartConfigReport {
+	var moduleID uint64 = 0
+	module, err := svc.store.LookupComposeModuleByNamespaceIDHandle(ctx, nsID, r.ModuleHandle)
+	if err == nil && module != nil {
+		moduleID = module.ID
+	}
+	return &types.ChartConfigReport{
+		ReportID:   nextID(),
+		ModuleID:   moduleID,
+		Filter:     r.Filter,
+		Metrics:    r.Metrics,
+		Dimensions: r.Dimensions,
+		YAxis:      r.YAxis,
+		Legend:     r.Legend,
+		Tooltip:    r.Tooltip,
+		Offset:     r.Offset,
+		Renderer:   r.Renderer,
+	}
+}
+
 // lookup fn() orchestrates chart lookup, namespace preload and check
 func (svc chart) lookup(ctx context.Context, namespaceID uint64, lookup func(*chartActionProps) (*types.Chart, error)) (c *types.Chart, err error) {
 	var aProps = &chartActionProps{chart: &types.Chart{NamespaceID: namespaceID}}

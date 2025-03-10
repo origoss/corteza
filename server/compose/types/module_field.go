@@ -19,7 +19,7 @@ type (
 	// Modules - CRM module definitions
 	ModuleField struct {
 		ID          uint64 `json:"fieldID,string"`
-        NamespaceID uint64 `json:"namespaceID,string"`
+		NamespaceID uint64 `json:"namespaceID,string"`
 		ModuleID    uint64 `json:"moduleID,string"`
 		Place       int    `json:"-"`
 
@@ -51,11 +51,29 @@ type (
 		Label string `json:"label"`
 	}
 
+	ModuleFieldExportable struct {
+		Place       int                         `json:"place" yaml:"place"`
+		Kind        string                      `json:"kind" yaml:"kind"`
+		Name        string                      `json:"name" yaml:"name"`
+		Options     ModuleFieldOptions          `json:"options" yaml:"options"`
+		Config      ModuleFieldConfigExportable `json:"config" yaml:"config"`
+		Required    bool                        `json:"isRequired" yaml:"isRequired"`
+		Multi       bool                        `json:"isMulti" yaml:"isMulti"`
+		Expressions ModuleFieldExpr             `json:"expressions" yaml:"expressions"`
+		Labels      map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+		Label       string                      `json:"label" yaml:"label"`
+	}
+
 	ModuleFieldConfig struct {
 		DAL     ModuleFieldConfigDAL         `json:"dal"`
 		Privacy ModuleFieldConfigDataPrivacy `json:"privacy"`
 
 		RecordRevisions ModuleFieldConfigRecordRevisions `json:"recordRevisions"`
+	}
+
+	ModuleFieldConfigExportable struct {
+		Privacy         ModuleFieldConfigDataPrivacy     `json:"privacy" yaml:"privacy"`
+		RecordRevisions ModuleFieldConfigRecordRevisions `json:"recordRevisions" yaml:"recordRevisions"`
 	}
 
 	// ModuleFieldConfigDAL holds DAL configuration for a specific field

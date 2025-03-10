@@ -69,6 +69,8 @@ type (
 
 		// @note probably temporary just so tests are easier
 		ReloadDALModels(ctx context.Context) error
+
+		MakeExportableModule(m *types.Module) *types.ModuleExportable
 	}
 
 	moduleUpdateHandler func(ctx context.Context, ns *types.Namespace, c *types.Module) (moduleChanges, error)
@@ -283,6 +285,132 @@ func (svc module) FindByAny(ctx context.Context, namespaceID uint64, identifier 
 	}
 
 	return m, nil
+}
+
+func (svc *module) MakeExportableModule(m *types.Module) *types.ModuleExportable {
+	var exportableFields []types.ModuleFieldExportable
+	for _, field := range m.Fields {
+		ef := svc.MakeExportableModuleField(field)
+		exportableFields = append(exportableFields, *ef)
+	}
+	config := svc.MakeExportableModuleConfig(&m.Config)
+	return &types.ModuleExportable{
+		Name:   m.Name,
+		Handle: m.Handle,
+		Config: *config,
+		Meta:   m.Meta,
+		Fields: exportableFields,
+		Labels: m.Labels,
+		Issues: m.Issues,
+	}
+}
+
+func (svc *module) CreateModuleFromExportable(m *types.ModuleExportable, nsID uint64) *types.Module {
+	id := nextID()
+	var moduleFields []*types.ModuleField
+	for _, f := range m.Fields {
+		field := svc.CreateModuleFieldFromExportable(&f, nsID, id)
+		moduleFields = append(moduleFields, field)
+	}
+	config := svc.CreateModuleConfigFromExportable(&m.Config)
+	return &types.Module{
+		ID:          id,
+		Name:        m.Name,
+		Handle:      m.Handle,
+		NamespaceID: nsID,
+		Config:      *config,
+		Meta:        m.Meta,
+		Fields:      moduleFields,
+		Labels:      m.Labels,
+		Issues:      m.Issues,
+		CreatedAt:   *now(),
+	}
+}
+
+func (svc *module) MakeExportableModuleConfig(c *types.ModuleConfig) *types.ModuleConfigExportable {
+	dal := svc.MakeExportableModuleConfigDAL(&c.DAL)
+	return &types.ModuleConfigExportable{
+		DAL:             *dal,
+		Privacy:         c.Privacy,
+		Discovery:       c.Discovery,
+		RecordRevisions: c.RecordRevisions,
+		RecordDeDup:     c.RecordDeDup,
+	}
+}
+
+func (svc *module) CreateModuleConfigFromExportable(c *types.ModuleConfigExportable) *types.ModuleConfig {
+	dal := svc.CreateModuleConfigDALFromExportable(&c.DAL)
+	return &types.ModuleConfig{
+		DAL:             *dal,
+		Privacy:         c.Privacy,
+		Discovery:       c.Discovery,
+		RecordRevisions: c.RecordRevisions,
+		RecordDeDup:     c.RecordDeDup,
+	}
+}
+
+func (svc *module) MakeExportableModuleConfigDAL(d *types.ModuleConfigDAL) *types.ModuleConfigDALExportable {
+	return &types.ModuleConfigDALExportable{
+		Constraints: d.Constraints,
+		Ident:       d.Ident,
+	}
+}
+
+func (svc *module) CreateModuleConfigDALFromExportable(d *types.ModuleConfigDALExportable) *types.ModuleConfigDAL {
+	return &types.ModuleConfigDAL{
+		Constraints: d.Constraints,
+		Ident:       d.Ident,
+	}
+}
+
+func (svc *module) MakeExportableModuleField(f *types.ModuleField) *types.ModuleFieldExportable {
+	config := svc.MakeExportableModuleFieldConfig(&f.Config)
+	return &types.ModuleFieldExportable{
+		Name:        f.Name,
+		Kind:        f.Kind,
+		Place:       f.Place,
+		Options:     f.Options,
+		Config:      *config,
+		Required:    f.Required,
+		Multi:       f.Multi,
+		Labels:      f.Labels,
+		Label:       f.Label,
+		Expressions: f.Expressions,
+	}
+}
+
+func (svc *module) CreateModuleFieldFromExportable(f *types.ModuleFieldExportable, nsID uint64, moduleID uint64) *types.ModuleField {
+	config := svc.CreateModuleFieldConfigFromExportable(&f.Config)
+	return &types.ModuleField{
+		ID:          nextID(),
+		NamespaceID: nsID,
+		ModuleID:    moduleID,
+		Name:        f.Name,
+		Kind:        f.Kind,
+		Place:       f.Place,
+		Options:     f.Options,
+		Config:      *config,
+		Required:    f.Required,
+		Multi:       f.Multi,
+		Labels:      f.Labels,
+		Label:       f.Label,
+		Expressions: f.Expressions,
+		CreatedAt:   *now(),
+	}
+}
+
+func (svc *module) MakeExportableModuleFieldConfig(c *types.ModuleFieldConfig) *types.ModuleFieldConfigExportable {
+	return &types.ModuleFieldConfigExportable{
+		Privacy:         c.Privacy,
+		RecordRevisions: c.RecordRevisions,
+	}
+}
+
+func (svc *module) CreateModuleFieldConfigFromExportable(c *types.ModuleFieldConfigExportable) *types.ModuleFieldConfig {
+	return &types.ModuleFieldConfig{
+		Privacy:         c.Privacy,
+		RecordRevisions: c.RecordRevisions,
+	}
 }
 
 func (svc module) proc(ctx context.Context, m *types.Module) {

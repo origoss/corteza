@@ -100,6 +100,53 @@ func (svc page) FindByPageID(ctx context.Context, namespaceID, pageID uint64) (p
 	})
 }
 
+func (svc *page) MakeExportablePage(ctx context.Context, p *types.Page) (*types.PageExportable, error) {
+	moduleHandle := ""
+	if p.ModuleID != 0 {
+		module, err := loadModule(ctx, svc.store, p.NamespaceID, p.ModuleID)
+		if err != nil {
+			return nil, err
+		}
+		moduleHandle = module.Handle
+	}
+	return &types.PageExportable{
+		Handle:       p.Handle,
+		ModuleHandle: moduleHandle,
+		Config:       p.Config,
+		Blocks:       p.Blocks,
+		Meta:         p.Meta,
+		Labels:       p.Labels,
+		Visible:      p.Visible,
+		Weight:       p.Weight,
+		Title:        p.Title,
+		Description:  p.Description,
+	}, nil
+}
+
+func (svc *page) CreatePageFromExportable(ctx context.Context, p *types.PageExportable, nsID uint64) *types.Page {
+	var moduleID uint64 = 0
+	module, err := svc.store.LookupComposeModuleByNamespaceIDHandle(ctx, nsID, p.ModuleHandle)
+	if err == nil && module != nil {
+		moduleID = module.ID
+	}
+	id := nextID()
+	return &types.Page{
+		ID:          id,
+		SelfID:      id,
+		NamespaceID: nsID,
+		ModuleID:    moduleID,
+		Handle:      p.Handle,
+		Config:      p.Config,
+		Blocks:      p.Blocks,
+		Meta:        p.Meta,
+		Labels:      p.Labels,
+		Visible:     p.Visible,
+		Weight:      p.Weight,
+		Title:       p.Title,
+		Description: p.Description,
+	}
+}
+
 func checkPage(ctx context.Context, ac pageAccessController) func(res *types.Page) (bool, error) {
 	return func(res *types.Page) (bool, error) {
 		if !ac.CanReadPage(ctx, res) {

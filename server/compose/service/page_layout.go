@@ -100,6 +100,102 @@ func (svc pageLayout) FindByPageLayoutID(ctx context.Context, namespaceID, pageL
 	})
 }
 
+func (svc *pageLayout) MakeExportablePageLayout(ctx context.Context, pl *types.PageLayout) (*types.PageLayoutExportable, error) {
+	parentHandle := ""
+	if pl.ParentID != 0 {
+		parent, err := loadPageLayout(ctx, svc.store, pl.NamespaceID, pl.PageID, pl.ParentID)
+		if err != nil {
+			return nil, err
+		}
+		parentHandle = parent.Handle
+	}
+	config := svc.MakeExportablePageLayoutConfig(&pl.Config)
+	return &types.PageLayoutExportable{
+		Handle:       pl.Handle,
+		ParentHandle: parentHandle,
+		Primary:      pl.Primary,
+		Weight:       pl.Weight,
+		Meta:         pl.Meta,
+		Config:       *config,
+		Blocks:       pl.Blocks,
+		Labels:       pl.Labels,
+	}, nil
+}
+
+func (svc *pageLayout) CreatePageLayoutFromExportable(ctx context.Context, pl *types.PageLayoutExportable, nsID uint64, pageID uint64) *types.PageLayout {
+	var parentID uint64 = 0
+	if pl.ParentHandle != "" {
+		parentLayout, err := svc.store.LookupComposePageLayoutByNamespaceIDPageIDHandle(ctx, nsID, pageID, pl.ParentHandle)
+		if err == nil && parentLayout != nil {
+			parentID = parentLayout.ID
+		}
+	}
+	config := svc.CreatePageLayoutConfigFromExportable(&pl.Config)
+	return &types.PageLayout{
+		ID:          nextID(),
+		Handle:      pl.Handle,
+		ParentID:    parentID,
+		NamespaceID: nsID,
+		PageID:      pageID,
+		Primary:     pl.Primary,
+		Weight:      pl.Weight,
+		Meta:        pl.Meta,
+		Config:      *config,
+		Blocks:      pl.Blocks,
+		Labels:      pl.Labels,
+		CreatedAt:   *now(),
+	}
+}
+
+func (svc *pageLayout) MakeExportablePageLayoutConfig(plc *types.PageLayoutConfig) *types.PageLayoutConfigExportable {
+	var exportableActions []types.PageLayoutActionExportable
+	for _, action := range plc.Actions {
+		a := svc.MakeExportablePageLayoutAction(&action)
+		exportableActions = append(exportableActions, *a)
+	}
+	return &types.PageLayoutConfigExportable{
+		Visibility: plc.Visibility,
+		Buttons:    plc.Buttons,
+		Actions:    exportableActions,
+		UseTitle:   plc.UseTitle,
+	}
+}
+
+func (svc *pageLayout) CreatePageLayoutConfigFromExportable(plc *types.PageLayoutConfigExportable) *types.PageLayoutConfig {
+	var layoutActions []types.PageLayoutAction
+	for _, a := range plc.Actions {
+		action := svc.CreatePageLayoutActionFromExportable(&a)
+		layoutActions = append(layoutActions, *action)
+	}
+	return &types.PageLayoutConfig{
+		Visibility: plc.Visibility,
+		Buttons:    plc.Buttons,
+		Actions:    layoutActions,
+		UseTitle:   plc.UseTitle,
+	}
+}
+
+func (svc *pageLayout) MakeExportablePageLayoutAction(pla *types.PageLayoutAction) *types.PageLayoutActionExportable {
+	return &types.PageLayoutActionExportable{
+		Placement: pla.Placement,
+		Meta:      pla.Meta,
+		Enabled:   pla.Enabled,
+		Kind:      pla.Kind,
+		Params:    pla.Params,
+	}
+}
+
+func (svc *pageLayout) CreatePageLayoutActionFromExportable(pla *types.PageLayoutActionExportable) *types.PageLayoutAction {
+	return &types.PageLayoutAction{
+		ActionID:  nextID(),
+		Placement: pla.Placement,
+		Meta:      pla.Meta,
+		Enabled:   pla.Enabled,
+		Kind:      pla.Kind,
+		Params:    pla.Params,
+	}
+}
+
 func checkPageLayout(ctx context.Context, ac pageLayoutAccessController) func(res *types.PageLayout) (bool, error) {
 	return func(res *types.PageLayout) (bool, error) {
 		if !ac.CanReadPageLayout(ctx, res) {

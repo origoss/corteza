@@ -39,26 +39,37 @@ type (
 		DeletedAt *time.Time `json:"deletedAt,omitempty"`
 	}
 
+	PageLayoutExportable struct {
+		Handle       string                     `json:"handle" yaml:"handle"`
+		ParentHandle string                     `json:"parentHandle" yaml:"parentHandle"`
+		Primary      bool                       `json:"primary" yaml:"primary"`
+		Weight       int                        `json:"weight" yaml:"weight"`
+		Meta         PageLayoutMeta             `json:"meta,omitempty" yaml:"meta,omitempty"`
+		Config       PageLayoutConfigExportable `json:"config" yaml:"config"`
+		Blocks       PageLayoutBlocks           `json:"blocks,omitempty" yaml:"blocks,omitempty"`
+		Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
+	}
+
 	PageLayoutBlocks []PageLayoutBlock
 
 	PageLayoutBlock struct {
 		BlockID uint64         `json:"blockID,string,omitempty" yaml:"blockID"`
 		XYWH    [4]int         `json:"xywh" yaml:"xywh"`
-		Meta    map[string]any `json:"meta,omitempty"`
+		Meta    map[string]any `json:"meta,omitempty" yaml:"meta,omitempty"`
 	}
 
 	PageLayoutMeta struct {
 		// Warning: value of this field is now handled via resource-translation facility
 		//          struct field is kept for the convenience for now since it allows us
 		//          easy encoding/decoding of the outgoing/incoming values
-		Title string `json:"title"`
+		Title string `json:"title" yaml:"title"`
 
 		// Warning: value of this field is now handled via resource-translation facility
 		//          struct field is kept for the convenience for now since it allows us
 		//          easy encoding/decoding of the outgoing/incoming values
-		Description string `json:"description"`
+		Description string `json:"description" yaml:"description"`
 
-		Style map[string]any `json:"style,omitempty"`
+		Style map[string]any `json:"style,omitempty" yaml:"style,omitempty"`
 	}
 
 	PageLayoutButton struct {
@@ -88,9 +99,16 @@ type (
 		UseTitle bool `json:"useTitle"`
 	}
 
+	PageLayoutConfigExportable struct {
+		Visibility PageLayoutVisibility         `json:"visibility" yaml:"visibility"`
+		Buttons    PageLayoutButtonConfig       `json:"buttons" yaml:"buttons"`
+		Actions    []PageLayoutActionExportable `json:"actions,omitempty" yaml:"actions,omitempty"`
+		UseTitle   bool                         `json:"useTitle" yaml:"useTitle"`
+	}
+
 	PageLayoutVisibility struct {
-		Expression string   `json:"expression"`
-		Roles      []string `json:"roles,omitempty"`
+		Expression string   `json:"expression"  yaml:"expression"`
+		Roles      []string `json:"roles,omitempty" yaml:"roles,omitempty"`
 	}
 
 	PageLayoutAction struct {
@@ -103,6 +121,14 @@ type (
 		// can use for execution
 		Kind   string `json:"kind"`
 		Params any    `json:"params"`
+	}
+
+	PageLayoutActionExportable struct {
+		Placement string               `json:"placement" yaml:"placement"`
+		Meta      PageLayoutActionMeta `json:"meta" yaml:"meta"`
+		Enabled   bool                 `json:"enabled" yaml:"enabled"`
+		Kind      string               `json:"kind" yaml:"kind"`
+		Params    any                  `json:"params" yaml:"params"`
 	}
 
 	PageLayoutActionMeta struct {

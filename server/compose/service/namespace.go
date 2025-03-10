@@ -76,6 +76,8 @@ type (
 		ImportInit(ctx context.Context, f multipart.File, size int64) (namespaceImportSession, error)
 		ImportRun(ctx context.Context, sessionID uint64, dup *types.Namespace) (ns *types.Namespace, err error)
 		DeleteByID(ctx context.Context, namespaceID uint64) error
+
+		MakeExportableNamespace(n *types.Namespace) *types.NamespaceExportable
 	}
 
 	namespaceUpdateHandler func(ctx context.Context, ns *types.Namespace) (namespaceChanges, error)
@@ -272,6 +274,26 @@ func (svc namespace) Update(ctx context.Context, upd *types.Namespace) (c *types
 	return svc.updater(ctx, upd.ID, NamespaceActionUpdate, svc.handleUpdate(ctx, upd))
 }
 
+func (svc *namespace) MakeExportableNamespace(n *types.Namespace) *types.NamespaceExportable {
+	return &types.NamespaceExportable{
+		Name:    n.Name,
+		Slug:    n.Slug,
+		Enabled: n.Enabled,
+		Labels:  n.Labels,
+	}
+}
+
+func (svc *namespace) CreateNamespaceFromExportable(n *types.NamespaceExportable) *types.Namespace {
+	return &types.Namespace{
+		ID:        nextID(),
+		Name:      n.Name,
+		Slug:      n.Slug,
+		Enabled:   n.Enabled,
+		Labels:    n.Labels,
+		CreatedAt: *now(),
+	}
+}
+
 func (svc namespace) Clone(ctx context.Context, namespaceID uint64, dup *types.Namespace, decoder func() (envoyx.NodeSet, error)) (ns *types.Namespace, err error) {
 	var (
 		aProps = &namespaceActionProps{namespace: dup}
@@ -340,6 +362,102 @@ func (svc namespace) Clone(ctx context.Context, namespaceID uint64, dup *types.N
 }
 
 func (svc namespace) ImportInit(ctx context.Context, f multipart.File, size int64) (namespaceImportSession, error) {
+	var (
+		aProps  = &namespaceActionProps{}
+		err     error
+		ns      *types.Namespace
+		session namespaceImportSession
+		nodes   envoyx.NodeSet
+
+		esvc = envoyx.Global()
+		nn   envoyx.NodeSet
+	)
+
+	err = func() error {
+		// access control
+		if err := svc.canImport(ctx); err != nil {
+			return err
+		}
+
+		// archive type check
+		mt, err := mimetype.DetectReader(f)
+		if err != nil {
+			return err
+		}
+		aProps.setArchiveFormat(mt.Extension())
+		if !mt.Is("application/zip") {
+			return NamespaceErrUnsupportedImportFormat()
+		}
+
+		_, err = f.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+
+		// un-archive
+		archive, err := zip.NewReader(f, size)
+		if err != nil {
+			return err
+		}
+
+		for _, zf := range archive.File {
+			if zf.FileInfo().IsDir() {
+				continue
+			}
+
+			f, err := zf.Open()
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			nn, _, err = esvc.Decode(ctx, envoyx.DecodeParams{
+				Type: envoyx.DecodeTypeIO,
+				Params: map[string]any{
+					"reader": f,
+					"mime":   "text/yaml",
+				},
+			})
+			if err != nil {
+				return err
+			}
+
+			nodes = append(nodes, nn...)
+		}
+
+		// store a session for later
+		session = namespaceImportSession{
+			SessionID: nextID(),
+			UserID:    auth.GetIdentityFromContext(ctx).Identity(),
+
+			CreatedAt: *now(),
+			Nodes:     nodes,
+		}
+
+		// find the ns node
+		for _, n := range nodes {
+			if n.ResourceType == types.NamespaceResourceType {
+				ns = n.Resource.(*types.Namespace)
+			}
+		}
+		if ns == nil {
+			return NamespaceErrImportMissingNamespace()
+		}
+
+		// session needs to have namespaceID if ns Handle is not provided
+		session.NamespaceID = ns.ID
+		session.Name = ns.Name
+		session.Slug = ns.Slug
+		namespaceSessionStore[session.SessionID] = session
+
+		aProps.setNamespace(ns)
+		return nil
+	}()
+
+	return session, svc.recordAction(ctx, aProps, NamespaceActionImportInit, err)
+}
+
+func (svc namespace) ImportInitOld(ctx context.Context, f multipart.File, size int64) (namespaceImportSession, error) {
 	var (
 		aProps  = &namespaceActionProps{}
 		err     error
